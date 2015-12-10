@@ -45,7 +45,7 @@ namespace mail
 
 		// 选择一个文件夹
 		m_map_command_format.insert(
-			std::pair<std::string, boost::format>("SELECT", boost::format("a007 SELECT %1%"))
+			std::pair<std::string, boost::format>("SELECT", boost::format("a007 SELECT %1%\r\n"))
 			);
 
 		// 获取目录
@@ -53,14 +53,19 @@ namespace mail
 			std::pair<std::string, boost::format>("LIST", boost::format("a008 LIST %1% %2%\r\n"))
 			);
 
+		// 获取右键内容
+		m_map_command_format.insert(
+			std::pair<std::string, boost::format>("FETCH", boost::format("a009 FETCH %1% %2%\r\n"))
+			);
 
+		// callback
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a001", boost::bind(&imap_protoc::on_handle_login_event, this, _1)));
-		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a002", boost::bind(&imap_protoc::on_handle_command_error_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a002", boost::bind(&imap_protoc::on_handle_noop_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a003", boost::bind(&imap_protoc::on_handle_logout_event, this, _1)));
-		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a008", boost::bind(&imap_protoc::on_handle_fetch_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a007", boost::bind(&imap_protoc::on_handle_select_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a008", boost::bind(&imap_protoc::on_handle_list_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a009", boost::bind(&imap_protoc::on_handle_fetch_event, this, _1)));
 
-
-		
 		// 链接到服务器
 		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(server_name), boost::lexical_cast<int>(server_port));
 		m_mail_socket.async_connect(endpoint, boost::bind(&imap_protoc::on_handle_connect_server, this, _1));
@@ -119,35 +124,102 @@ namespace mail
 		m_mail_socket.async_send(boost::asio::buffer(command.c_str(), command.size()), boost::bind(&imap_protoc::on_handle_send_buf, this, _1, _2, command));
 	}
 
+
+	std::vector<std::string> imap_protoc::split(const std::string& src)
+	{
+		std::vector<std::string> vec_sp;
+		std::string result;
+		auto it = src.begin();
+		while (it != src.end())
+		{
+			switch (*it)
+			{
+			case '\n':
+				result.push_back(*it);
+				vec_sp.push_back(std::move(result));
+				break;
+			default:
+				result.push_back(*it);
+				break;
+			}
+
+			++it;
+		}
+		return vec_sp;
+	}
+
 	void imap_protoc::on_handle_login_event(const std::string& stream)
 	{
-		std::cout << "邮箱登录成功, 拉取所有文件夹" << std::endl;
+		std::cout << "邮箱登录成功" << std::endl;
+		std::cout << stream << std::endl;
 
-		const std::string command = boost::str(m_map_command_format["LIST"] % "\"\"" % "\"%\"");
+		std::string command = boost::str(m_map_command_format["LIST"] % "\"\"" % "\"%\"");
+		std::cout << "拉取所有目录" << command << std::endl;
 		send_command(command);
-
 	}
 
 	void imap_protoc::on_handle_logout_event(const std::string& stream)
 	{
+		std::cout << "退出邮箱" << std::endl;
+		std::cout << stream << std::endl;
+
+		// 停止呼吸包
+		m_send_status_timer.cancel();
+		
+		// 退出邮箱
+		boost::system::error_code ec;
+		m_mail_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
+
+		// 退出io
+		m_io.stop();
+	}
+
+	void imap_protoc::on_handle_list_event(const std::string& stream)
+	{
+		std::cout << "获取文件夹" << std::endl;
+		std::cout << stream << std::endl;
+
+		std::string command  = boost::str(m_map_command_format["SELECT"] % "INBOX");
+		std::cout << "选中收件箱" << command << std::endl;
+		send_command(command);
 	}
 
 	void imap_protoc::on_handle_fetch_event(const std::string& stream)
 	{
-		std::cout << "获取文件夹" << stream << std::endl;
+		std::cout << "获取邮件内容" << std::endl;
+		std::cout << stream << std::endl;
 	}
+
+	void imap_protoc::on_handle_select_event(const std::string& stream)
+	{
+		std::cout << "选中文件夹" << std::endl;
+		std::cout << stream << std::endl;
+
+		//const std::string command = boost::str(m_map_command_format["FETCH"] % "1" % "ALL");
+		//send_command(command);
+	}
+
 
 	void imap_protoc::on_handle_noop_event(const std::string& stream)
 	{
-		std::cout << "服务器返回NOOP包" << stream << std::endl;
+		std::cout << "服务器返回NOOP包" <<  std::endl;
+		std::cout << stream << std::endl;
+//#ifdef _DEBUG
+//		const std::string command = boost::str(m_map_command_format["LOGOUT"]);
+//		send_command(command);
+//#endif
 	}
 
 	void imap_protoc::on_handle_command_error_event(const std::string& stream)
-	{}
+	{
+		std::cout << "错误信息:" << std::endl;
+		std::cout << stream << std::endl;
+	}
 
 	void imap_protoc::on_handle_unset_event(const std::string& stream)
 	{
-		std::cout << "接收到数据 " << stream << std::endl;
+		std::cout << "接收到未处理数据 " << std::endl;
+		std::cout << stream << std::endl;
 	}
 
 	void imap_protoc::on_handle_send_status()
@@ -181,32 +253,34 @@ namespace mail
 	{
 		if (error == 0 && bytes_transferred > 4)
 		{
+			boost::shared_ptr<int> finally(new int(0), [&cache_stream, this](int* p){
+				cache_stream = boost::make_shared<boost::asio::streambuf>();
+				boost::asio::async_read_until(m_mail_socket, *cache_stream, "\r\n", boost::bind(&imap_protoc::on_handle_recv_buf, this, _1, _2, cache_stream));
+			});
+
 			boost::asio::streambuf::const_buffers_type cache = cache_stream->data();
-			const std::string recv_buf(boost::asio::buffers_begin(cache), boost::asio::buffers_end(cache));
+			m_recv_buf.append(boost::asio::buffers_begin(cache), boost::asio::buffers_end(cache));
+
+			std::vector<std::string> vec_sp = split(m_recv_buf);
 
 			// 获取固定前缀
-			const std::string prefix_string(recv_buf.substr(0, 4));
+			auto it_vec_sp_end = vec_sp.rbegin();
+			if (it_vec_sp_end == vec_sp.rend())
+				return;
 
 			// 根据前缀进行处理
+			const std::string prefix_string(it_vec_sp_end->substr(0, 4));
 			auto it_map_event_handle = m_map_handle_event.find(prefix_string);
 			if (it_map_event_handle != m_map_handle_event.end())
 			{
-				it_map_event_handle->second(recv_buf);
-			}
-			else
-			{
-				on_handle_unset_event(recv_buf);
-			}
+				it_map_event_handle->second(std::move(m_recv_buf));
+				m_recv_buf.clear();
 
-			cache_stream = boost::make_shared<boost::asio::streambuf>();
-			boost::asio::async_read_until(m_mail_socket, *cache_stream, "\r\n", boost::bind(&imap_protoc::on_handle_recv_buf, this, _1, _2, cache_stream));
+			}
 		}
 		else
 		{
 			std::cout << error.message() << std::endl;
 		}
 	}
-
-
-
 }

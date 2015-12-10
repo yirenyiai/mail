@@ -22,7 +22,6 @@ namespace mail
 
 	};
 
-
 	class imap_protoc
 	{
 	public:
@@ -40,10 +39,8 @@ namespace mail
 		void set_mail_attribute(const mail_attribute&);
 		// 修改文件夹名字
 
-
 		// 退出当前邮箱
 		void exit_mail();
-
 	private:
 		void on_handle_connect_server(const boost::system::error_code& error);
 		void on_handle_send_status();
@@ -52,10 +49,15 @@ namespace mail
 
 		void send_command(const std::string&);
 
+
+		std::vector<std::string> split(const std::string& src);
+
 	protected:
 		void on_handle_login_event(const std::string& stream);
 		void on_handle_logout_event(const std::string& stream);
 
+		void on_handle_select_event(const std::string& stream);
+		void on_handle_list_event(const std::string& stream);
 		void on_handle_fetch_event(const std::string& stream);
 
 		void on_handle_noop_event(const std::string& stream);
@@ -93,12 +95,15 @@ namespace mail
 		// imap 指令固定4字节前缀
 		std::string m_pre_string;
 
+
 		// 服务器信息
 		imap_server m_server;
 		imap_login_account m_login_account;
 
 		// 定时器
 		boost::asio::deadline_timer m_send_status_timer;
+
+		std::string m_recv_buf;
 
 
 		std::map<std::string, boost::function<void(const std::string&)>> m_map_handle_event;
