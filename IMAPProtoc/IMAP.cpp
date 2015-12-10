@@ -29,7 +29,7 @@ namespace mail
 
 		// 删除目录
 		m_map_command_format.insert(
-			std::pair<std::string, boost::format>("DELETE", boost::format("a004 DELETE %1%"))
+			std::pair<std::string, boost::format>("DELETE", boost::format("a004 DELETE %1%\r\n"))
 			);
 
 		// 修改文件夹名字
@@ -53,18 +53,39 @@ namespace mail
 			std::pair<std::string, boost::format>("LIST", boost::format("a008 LIST %1% %2%\r\n"))
 			);
 
-		// 获取右键内容
+		// 获取邮件内容
 		m_map_command_format.insert(
 			std::pair<std::string, boost::format>("FETCH", boost::format("a009 FETCH %1% %2%\r\n"))
 			);
+
+		// 创建一个目录 
+		m_map_command_format.insert(
+			std::pair<std::string, boost::format>("CREATE", boost::format("a010 CREATE %1%\r\n"))
+			);
+
+
+		// 删除邮件
+		m_map_command_format.insert(
+			std::pair<std::string, boost::format>("STORE-DELETE", boost::format("a011 STORE %1% +FLAGS (\\Deleted)\r\n"))
+			);
+
+		// 标记为已读
+		m_map_command_format.insert(
+			std::pair<std::string, boost::format>("STORE-SEEN", boost::format("a012 STORE %1% +FLAGS (\\Seen)\r\n"))
+			);
+
 
 		// callback
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a001", boost::bind(&imap_protoc::on_handle_login_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a002", boost::bind(&imap_protoc::on_handle_noop_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a003", boost::bind(&imap_protoc::on_handle_logout_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a004", boost::bind(&imap_protoc::on_handle_delete_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a007", boost::bind(&imap_protoc::on_handle_select_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a008", boost::bind(&imap_protoc::on_handle_list_event, this, _1)));
 		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a009", boost::bind(&imap_protoc::on_handle_fetch_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a010", boost::bind(&imap_protoc::on_handle_create_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a011", boost::bind(&imap_protoc::on_handle_store_delete_event, this, _1)));
+		m_map_handle_event.insert(std::pair<std::string, boost::function<void(const std::string&)>>("a012", boost::bind(&imap_protoc::on_handle_store_seen_event, this, _1)));
 
 		// 链接到服务器
 		boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(server_name), boost::lexical_cast<int>(server_port));
@@ -79,9 +100,10 @@ namespace mail
 		}
 	}
 
-	// 删除邮件
-	void imap_protoc::delete_mail(const std::string& mail_title)
+	void imap_protoc::create_dir(const std::string& floder_name)
 	{
+		std::string command = boost::str(m_map_command_format["CREATE"] % floder_name);
+		send_command(command);
 	}
 
 	void imap_protoc::delete_dir(const std::string& floder_name)
@@ -92,8 +114,25 @@ namespace mail
 
 
 	// 调整当前邮件属性
-	void imap_protoc::set_mail_attribute(const mail_attribute&)
+	void imap_protoc::set_mail_attribute(const std::string& mail_id, const mail_attribute& attr)
 	{
+		switch (attr)
+		{
+		case mail_attribute::mail_attribute_readed:
+		{
+			std::string command = boost::str(m_map_command_format["STORE-SEEN"] % mail_id);
+			send_command(command);
+		}
+			break;
+		case mail_attribute::mail_attribute_delete:
+		{
+			std::string command = boost::str(m_map_command_format["STORE-DELETE"] % mail_id);
+			send_command(command);
+		}
+			break;
+		default:
+			break;
+		}
 	}
 
 	void imap_protoc::exit_mail()
@@ -107,9 +146,14 @@ namespace mail
 		if (error != 0)
 			return;
 
-		// 发送登包
-		const std::string login_command = boost::str(m_map_command_format["LOGIN"] % m_login_account.m_account % m_login_account.m_password);
-		send_command(login_command);
+		std::cout << "链接IMAP服务器成功" << std::endl;
+
+		if (!m_login_account.m_account.empty())
+		{
+			// 发送登包
+			const std::string login_command = boost::str(m_map_command_format["LOGIN"] % m_login_account.m_account % m_login_account.m_password);
+			send_command(login_command);
+		}
 
 		// 设置常规的呼吸包
 		m_send_status_timer.async_wait(boost::bind(&imap_protoc::on_handle_send_status, this));
@@ -190,13 +234,38 @@ namespace mail
 		std::cout << stream << std::endl;
 	}
 
+	void imap_protoc::on_handle_create_event(const std::string& stream)
+	{
+		std::cout << "创建文件夹" << std::endl;
+		std::cout << stream << std::endl;
+	}
+
+
+	void imap_protoc::on_handle_store_seen_event(const std::string& stream)
+	{
+		std::cout << "调整邮件标志--已阅" << std::endl;
+		std::cout << stream << std::endl;
+	}
+
+	void imap_protoc::on_handle_store_delete_event(const std::string& stream)
+	{
+		std::cout << "调整邮件标志--删除" << std::endl;
+		std::cout << stream << std::endl;
+	}
+
+	void imap_protoc::on_handle_delete_event(const std::string& stream)
+	{
+		std::cout << "删除文件夹" << std::endl;
+		std::cout << stream << std::endl;
+	}
+
 	void imap_protoc::on_handle_select_event(const std::string& stream)
 	{
 		std::cout << "选中文件夹" << std::endl;
 		std::cout << stream << std::endl;
 
-		//const std::string command = boost::str(m_map_command_format["FETCH"] % "1" % "ALL");
-		//send_command(command);
+		const std::string command = boost::str(m_map_command_format["FETCH"] % "*" % "ALL");
+		send_command(command);
 	}
 
 
@@ -204,10 +273,10 @@ namespace mail
 	{
 		std::cout << "服务器返回NOOP包" <<  std::endl;
 		std::cout << stream << std::endl;
-//#ifdef _DEBUG
-//		const std::string command = boost::str(m_map_command_format["LOGOUT"]);
-//		send_command(command);
-//#endif
+#ifdef _DEBUG
+		//const std::string command = boost::str(m_map_command_format["LOGOUT"]);
+		//send_command(command);
+#endif
 	}
 
 	void imap_protoc::on_handle_command_error_event(const std::string& stream)
@@ -273,9 +342,9 @@ namespace mail
 			auto it_map_event_handle = m_map_handle_event.find(prefix_string);
 			if (it_map_event_handle != m_map_handle_event.end())
 			{
-				it_map_event_handle->second(std::move(m_recv_buf));
+				m_recv_buf = boost::locale::conv::between(m_recv_buf, "GBK", "UTF-8");
+				it_map_event_handle->second(m_recv_buf);
 				m_recv_buf.clear();
-
 			}
 		}
 		else

@@ -8,6 +8,7 @@
 #include <boost/coroutine/coroutine.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/locale.hpp>
 #include <string>
 #include <map>
 
@@ -31,12 +32,12 @@ namespace mail
 		imap_protoc(boost::asio::io_service& io, const std::string& server_name, const std::string& server_port, const std::string& account, const std::string& password);
 		~imap_protoc();
 
-		// 删除邮件
-		void delete_mail(const std::string& mail_title);
+		// 创建目录
+		void create_dir(const std::string& floder_name);
 		// 删除某个目录
 		void delete_dir(const std::string& floder_name);
 		// 调整当前邮件属性
-		void set_mail_attribute(const mail_attribute&);
+		void set_mail_attribute(const std::string& mail_id, const mail_attribute&);
 		// 修改文件夹名字
 
 		// 退出当前邮箱
@@ -56,9 +57,13 @@ namespace mail
 		void on_handle_login_event(const std::string& stream);
 		void on_handle_logout_event(const std::string& stream);
 
+		void on_handle_store_seen_event(const std::string& stream);
+		void on_handle_store_delete_event(const std::string& stream);
+		void on_handle_delete_event(const std::string& stream);
 		void on_handle_select_event(const std::string& stream);
 		void on_handle_list_event(const std::string& stream);
 		void on_handle_fetch_event(const std::string& stream);
+		void on_handle_create_event(const std::string& stream);
 
 		void on_handle_noop_event(const std::string& stream);
 
