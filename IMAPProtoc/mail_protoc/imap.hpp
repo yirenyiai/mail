@@ -154,13 +154,12 @@ namespace mx
 
 					m_cache_stream.reset(new boost::asio::streambuf());
 					BOOST_ASIO_CORO_YIELD
-						async_read_until(*m_mail_socket, *m_cache_stream, "\r\n", boost::bind(*this, _1, _2));
+						async_read_until(*m_mail_socket, *m_cache_stream, "a009", boost::bind(*this, _1, _2));
 
 					if (ec)
 						return;
 
-					// std::cout << "FETCH MAIL MIME： " << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl;
-
+					 std::cout << "FETCH MAIL MIME： " << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl << std::endl;
 
 					InternetMailFormat imf;
 					mailcontent mail_ctx;
@@ -181,6 +180,8 @@ namespace mx
 
 					on_mail_function(m_mail_ctx);
 				}
+				std::cout << "FETCH MAIL MIME： " << m_recv_buf << std::endl << std::endl;
+
 
 				m_current_mail_summary_index = 0;
 
@@ -249,6 +250,7 @@ namespace mx
 		// 服务器邮件数量
 		int m_current_mail_summary_index;
 		int m_server_mail_count;
+
 
 		boost::shared_ptr<on_mail_function>		m_sig_gotmail;
 
