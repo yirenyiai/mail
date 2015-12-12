@@ -1,4 +1,5 @@
 #pragma once
+
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/format.hpp>
@@ -11,10 +12,11 @@
 #include <boost/locale.hpp>
 #include "boost/timedcall.hpp"
 
-#include "internet_mail_format.hpp"
+
 
 #include <string>
 #include <map>
+#include "internet_mail_format.hpp"
 
 namespace mx
 {
@@ -64,7 +66,6 @@ namespace mx
 
 		void operator()(const boost::system::error_code & ec, std::size_t length = 0, const std::string& command = "")
 		{
-			using namespace boost::asio;
 			std::string send_command;
 
 			BOOST_ASIO_CORO_REENTER(this) 
@@ -85,7 +86,7 @@ namespace mx
 
 				// 接收服务器返回的连接确认
 				m_cache_stream.reset(new boost::asio::streambuf());
-				BOOST_ASIO_CORO_YIELD async_read_until(*m_mail_socket, *m_cache_stream, "\r\n", boost::bind(*this, _1, _2));
+				BOOST_ASIO_CORO_YIELD boost::asio::async_read_until(*m_mail_socket, *m_cache_stream, "\r\n", boost::bind(*this, _1, _2));
 				if (ec)
 					return;
 
@@ -134,7 +135,7 @@ namespace mx
 
 				m_cache_stream.reset(new boost::asio::streambuf());
 				BOOST_ASIO_CORO_YIELD 
-					async_read_until(*m_mail_socket, *m_cache_stream, "\r\n", boost::bind(*this, _1, _2));
+					async_read_until(*m_mail_socket, *m_cache_stream, "a014", boost::bind(*this, _1, _2));
 
 				if (ec)
 					return;
@@ -159,40 +160,85 @@ namespace mx
 					if (ec)
 						return;
 
-					 std::cout << "FETCH MAIL MIME： " << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl << std::endl;
 
-					InternetMailFormat imf;
-					mailcontent mail_ctx;
-
+					InternetMailFormat& imf = m_mail_ctx[m_current_mail_summary_index];
 					std::stringstream ss;
 					ss << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data()));
 					imf_read_stream(imf, ss);
 
-					mail_ctx.from = imf.header["from"];
-					mail_ctx.to = imf.header["to"];
-					mail_ctx.subject = imf.header["subject"];
-					std::cout
-						<< "第 " << m_current_mail_summary_index << " 封邮件" << std::endl
-						<< "from :" << mail_ctx.from << std::endl
-						<< "to :" << mail_ctx.to << std::endl
-						<< "subject :" << mail_ctx.subject << std::endl
-						<< std::endl;
-
-					on_mail_function(m_mail_ctx);
 				}
-				std::cout << "FETCH MAIL MIME： " << m_recv_buf << std::endl << std::endl;
 
+				// 获取所有邮件的BODT-TEXT
+				m_current_mail_summary_index = 1;
+				for (; m_current_mail_summary_index <= m_server_mail_count; ++m_current_mail_summary_index)
+				{
+					send_command = boost::str(m_map_command_format["FETCH-BODY"] % m_current_mail_summary_index % "RFC822.TEXT");
+					BOOST_ASIO_CORO_YIELD
+						m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
 
-				m_current_mail_summary_index = 0;
+					if (length != command.size())
+						return;
+
+					m_cache_stream.reset(new boost::asio::streambuf());
+					BOOST_ASIO_CORO_YIELD
+						async_read_until(*m_mail_socket, *m_cache_stream, "a013", boost::bind(*this, _1, _2));
+
+					if (ec)
+						return;
+
+					BOOST_ASIO_CORO_YIELD[this](){
+						InternetMailFormat& imf = m_mail_ctx[m_current_mail_summary_index];
+						mailcontent mail_ctx;
+						std::stringstream ss;
+
+						ss << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data()));
+						imf_read_stream(imf, ss);
+
+						select_content(mail_ctx.content_type, mail_ctx.content, imf);
+
+						mail_ctx.from = imf.header["from"];
+						mail_ctx.to = imf.header["to"];
+						mail_ctx.subject = imf.header["subject"];
+
+						 m_io.post(boost::bind(&imap::broadcast_signal, this, m_sig_gotmail, mail_ctx, call_to_continue_function(boost::bind(*this, _1))));
+					}();
+
+					if (ec)
+						return;
+				}
+
 
 				// <TODO>: 校验所有的附件
+
 				// <TODO>: 进入IMAP NOOP呼吸状态
+				m_cache_stream.reset(new boost::asio::streambuf());
+				async_read_until(*m_mail_socket, *m_cache_stream, "\r\n", boost::bind(&imap::on_handle_command, this, _1, _2));
 			}
 		}
 
 	private:
 		void send_command(const std::string&);
 		std::vector<std::string> split(const std::string& src);
+		std::string get_from_name(const std::string& mail_form)
+		{
+			std::string result;
+			for (auto it(mail_form.begin()); it != mail_form.end(); ++it)
+			{
+				switch (*it)
+				{
+				case '\"':
+						break;
+				case '<':
+					return result;
+				default:
+					result.push_back(*it);
+					break;
+				}
+
+			}
+			return result;
+
+		}
 		int floder_mail_count(const std::string& str)
 		{
 			const std::vector<std::string> vec_sp = split(str);
@@ -226,6 +272,135 @@ namespace mx
 			return boost::lexical_cast<int>(strCount);
 		}
 
+		std::string find_mimetype(std::string contenttype)
+		{
+			if (!contenttype.empty()) {
+				std::vector<std::string> splited;
+				boost::split(splited, contenttype, boost::is_any_of("; "));
+				return splited[0].empty() ? contenttype : splited[0];
+			}
+
+			return "text/plain";
+		}
+
+		std::string decode_content_charset(std::string body, std::string content_type)
+		{
+			boost::cmatch what;
+			boost::regex ex("(.*)?;[\t \r\a]?charset=(.*)?");
+
+			if (boost::regex_search(content_type.c_str(), what, ex)) {
+				// text/plain; charset="gb18030" 这种，然后解码成 UTF-8
+				std::string charset = what[2];
+				return detail::ansi_utf8(body, charset);
+			}
+
+			return body;
+		}
+
+		// 有　text/plain　的就选　text/plain, 没的才选　text/html
+		std::pair<std::string, std::string>
+			select_best_mailcontent(InternetMailFormat & imf)
+		{
+			if (imf.have_multipart) {
+				return select_best_mailcontent(boost::get<MIMEcontent>(imf.body));
+			}
+			else {
+				std::string content_type = find_mimetype(imf.header["content-type"]);
+				std::string content = decode_content_charset(boost::get<std::string>(imf.body), imf.header["content-type"]);
+				return std::make_pair(content_type, content);
+			}
+		}
+
+		// 有　text/plain　的就选　text/plain, 没的才选　text/html
+		std::pair<std::string, std::string>
+			select_best_mailcontent(MIMEcontent mime)
+		{
+			BOOST_FOREACH(InternetMailFormat & v, mime) {
+				if (v.have_multipart) {
+					return select_best_mailcontent(v);
+				}
+
+				// 从 v.first aka contenttype 找到编码.
+				std::string mimetype = find_mimetype(v.header["content-type"]);
+
+				if (mimetype == "text/plain") {
+					return std::make_pair(v.header["content-type"], boost::get<std::string>(v.body));
+				}
+			}
+			BOOST_FOREACH(InternetMailFormat & v, mime) {
+				if (v.have_multipart) {
+					return select_best_mailcontent(v);
+				}
+
+				// 从 v.first aka contenttype 找到编码.
+				std::string mimetype = find_mimetype(v.header["content-type"]);
+
+				if (mimetype == "text/html")
+					return std::make_pair(v.header["content-type"], boost::get<std::string>(v.body));
+			}
+			return std::make_pair("", "");
+		}
+
+		void broadcast_signal(std::shared_ptr<imap::on_mail_function> sig_gotmail, mailcontent thismail, imap::call_to_continue_function handler)
+		{
+			if (sig_gotmail) {
+				(*sig_gotmail)(thismail, handler);
+			}
+			else {
+				handler(0);
+			}
+		}
+
+		// 从 IMF 中递归进行选择出一个最好的 mail content
+		void select_content(std::string& content_type, std::string& content, InternetMailFormat& imf)
+		{
+			std::pair<std::string, std::string> mc = select_best_mailcontent(imf);
+			content_type = find_mimetype(mc.first);
+			content = decode_content_charset(mc.second, mc.first);
+		}
+
+		void on_handle_command(const boost::system::error_code & ec, std::size_t bytes_transferred)
+		{
+			if (ec == 0 && bytes_transferred > 4)
+			{
+				boost::shared_ptr<int> finally(new int(0), [this](int* p){
+					if (p)
+						delete p;
+					p = nullptr;
+
+					m_cache_stream = boost::make_shared<boost::asio::streambuf>();
+					boost::asio::async_read_until(m_mail_socket, *m_cache_stream, "\r\n", boost::bind(&imap::on_handle_command, this, _1, _2, m_cache_stream));
+				});
+
+				boost::asio::streambuf::const_buffers_type cache = m_cache_stream->data();
+				m_recv_buf.append(boost::asio::buffers_begin(cache), boost::asio::buffers_end(cache));
+
+				std::vector<std::string> vec_sp = split(m_recv_buf);
+
+				auto it_vec_sp_end = vec_sp.rbegin();
+				if (it_vec_sp_end == vec_sp.rend())
+					return;
+
+				const std::string prefix_string(it_vec_sp_end->substr(0, 4));
+				auto it_map_event_handle = m_map_handle_event.find(prefix_string);
+				if (it_map_event_handle != m_map_handle_event.end())
+				{
+					m_recv_buf = boost::locale::conv::between(m_recv_buf, "GBK", "UTF-8");
+					it_map_event_handle->second(m_recv_buf);
+					m_recv_buf.clear();
+				}
+			}
+			else
+			{
+				std::cout << ec.message() << std::endl;
+			}
+
+
+
+			// 
+			m_cache_stream.reset(new boost::asio::streambuf());
+			async_read_until(*m_mail_socket, *m_cache_stream, "a002", boost::bind(&imap::on_handle_command, this, _1, _2));
+		}
 	private:
 		// 帐号信息
 		struct imap_login_account
@@ -251,13 +426,16 @@ namespace mx
 		int m_current_mail_summary_index;
 		int m_server_mail_count;
 
-
-		boost::shared_ptr<on_mail_function>		m_sig_gotmail;
+		boost::unordered::unordered_map<int, InternetMailFormat> m_mail_ctx;
+		std::shared_ptr<on_mail_function>		m_sig_gotmail;
 
 		boost::shared_ptr<boost::asio::streambuf> m_cache_stream;
 		std::string m_recv_buf;
 
 		std::map<std::string, boost::format> m_map_command_format;
+
+
+		boost::unordered::unordered_map<std::string, boost::function<void(std::string)>> m_map_handle_event;
 	};
 
 }

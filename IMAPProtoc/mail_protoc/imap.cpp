@@ -92,25 +92,21 @@ namespace mx
 	void imap::create_dir(const std::string& floder_name)
 	{
 		std::string command = boost::str(m_map_command_format["CREATE"] % floder_name);
-		send_command(command);
 	}
 
 	void imap::delete_dir(const std::string& floder_name)
 	{
 		std::string command =  boost::str(m_map_command_format["DELETE"] % floder_name);
-		send_command(command);
 	}
 
 	void imap::rename_dir(const std::string& old_floder_name, const std::string& new_floder_name)
 	{
 		std::string command = boost::str(m_map_command_format["RENAME"] % old_floder_name % new_floder_name);
-		send_command(command);
 	}
 
 	void imap::get_mail_ctx(const std::string& mail_id)
 	{
 		const std::string command = boost::str(m_map_command_format["FETCH-BODY"] % mail_id % "BODY[TEXT]");
-		send_command(command);
 	}
 
 
@@ -140,12 +136,6 @@ namespace mx
 	{
 		std::string command = boost::str(m_map_command_format["LOGOUT"]);
 		send_command(command);
-	}
-
-	void imap::send_command(const std::string& command)
-	{
-		// ÅÐ¶Ïµ±Ç°socketµÄ×´Ì¬
-		// m_mail_socket.async_send(boost::asio::buffer(command.c_str(), command.size()), boost::bind(, ));
 	}
 
 	std::vector<std::string> imap::split(const std::string& src)
