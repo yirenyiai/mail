@@ -2,16 +2,17 @@
 #include "imap.hpp"
 #include "internet_mail_format.hpp"
 
-
 namespace mx
 {
-	imap::imap(boost::asio::io_service& io, const std::string& account, const std::string& password, const std::string& server_name, const std::string& server_port)
+	imap::imap(boost::asio::io_service& io, const std::string& account, const std::string& password, const std::string& server_addr_string, bool ssl)
 		: m_io(io)
 		, m_mail_socket(boost::make_shared<boost::asio::ip::tcp::socket>(io))
-		, m_endpoint(boost::asio::ip::address::from_string(server_name), boost::lexical_cast<int>(server_port))
+		, m_server_addr_string(server_addr_string)
+		, m_server_port_string(ssl ? "993" : "143")
 		, m_login_account(account, password)
 		, m_current_mail_summary_index(1)
 		, m_server_mail_count(0)
+		, m_select_floder_index(0)
 	{
 		// 登录指令
 		m_map_command_format.insert(
@@ -23,7 +24,7 @@ namespace mx
 			std::pair<std::string, boost::format>("NOOP", boost::format("a002 NOOP\r\n"))
 			);
 
-		// 退出当前邮箱gg
+		// 退出当前邮箱
 		m_map_command_format.insert(
 			std::pair<std::string, boost::format>("LOGOUT", boost::format("a003 LOGOUT\r\n"))
 			);
@@ -46,7 +47,7 @@ namespace mx
 
 		// 选择一个文件夹
 		m_map_command_format.insert(
-			std::pair<std::string, boost::format>("SELECT", boost::format("a007 SELECT %1%\r\n"))
+			std::pair<std::string, boost::format>("SELECT", boost::format("a007 SELECT \"%1%\"\r\n"))
 			);
 
 		// 获取目录
@@ -96,7 +97,7 @@ namespace mx
 
 	void imap::delete_dir(const std::string& floder_name)
 	{
-		std::string command =  boost::str(m_map_command_format["DELETE"] % floder_name);
+		std::string command = boost::str(m_map_command_format["DELETE"] % floder_name);
 	}
 
 	void imap::rename_dir(const std::string& old_floder_name, const std::string& new_floder_name)
@@ -108,7 +109,6 @@ namespace mx
 	{
 		const std::string command = boost::str(m_map_command_format["FETCH-BODY"] % mail_id % "BODY[TEXT]");
 	}
-
 
 	// 调整当前邮件属性
 	void imap::set_mail_attribute(const std::string& mail_id, const mail_attribute& attr)
@@ -136,6 +136,12 @@ namespace mx
 	{
 		std::string command = boost::str(m_map_command_format["LOGOUT"]);
 		send_command(command);
+	}
+
+	void imap::send_command(const std::string& command)
+	{
+		if (m_mail_socket && m_mail_socket->is_open())
+			m_mail_socket->async_send(boost::asio::buffer(command.c_str(), command.size()), boost::bind(&imap::on_handle_send_buf, this, _1, _2, command));
 	}
 
 	std::vector<std::string> imap::split(const std::string& src)

@@ -1,27 +1,27 @@
 ========================================================================
-    CONSOLE APPLICATION : IMAPProtoc Project Overview
+    CONSOLE APPLICATION : MailProtoc Project Overview
 ========================================================================
 
-AppWizard has created this IMAPProtoc application for you.
+AppWizard has created this MailProtoc application for you.
 
 This file contains a summary of what you will find in each of the files that
-make up your IMAPProtoc application.
+make up your MailProtoc application.
 
 
-IMAPProtoc.vcxproj
+MailProtoc.vcxproj
     This is the main project file for VC++ projects generated using an Application Wizard.
     It contains information about the version of Visual C++ that generated the file, and
     information about the platforms, configurations, and project features selected with the
     Application Wizard.
 
-IMAPProtoc.vcxproj.filters
+MailProtoc.vcxproj.filters
     This is the filters file for VC++ projects generated using an Application Wizard. 
     It contains information about the association between the files in your project 
     and the filters. This association is used in the IDE to show grouping of files with
     similar extensions under a specific node (for e.g. ".cpp" files are associated with the
     "Source Files" filter).
 
-IMAPProtoc.cpp
+MailProtoc.cpp
     This is the main application source file.
 
 /////////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,7 @@ Other standard files:
 
 StdAfx.h, StdAfx.cpp
     These files are used to build a precompiled header (PCH) file
-    named IMAPProtoc.pch and a precompiled types file named StdAfx.obj.
+    named MailProtoc.pch and a precompiled types file named StdAfx.obj.
 
 /////////////////////////////////////////////////////////////////////////////
 Other notes:

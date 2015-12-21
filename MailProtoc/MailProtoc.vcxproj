@@ -11,9 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{7F010D57-5333-46F9-B1C9-09C43176277F}</ProjectGuid>
+    <ProjectGuid>{F59796D8-5AF7-4ADB-818A-6D69D1C162E1}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>IMAPProtoc</RootNamespace>
+    <RootNamespace>MailProtoc</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -41,21 +41,20 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(BOOST_ROOT);$(IncludePath)</IncludePath>
-    <LibraryPath>$(BOOST_LIB);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(BOOST_ROOT);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>$(BOOST_LIB);$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(BOOST_ROOT);$(IncludePath)</IncludePath>
-    <LibraryPath>$(BOOST_LIB);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>./protoc;./avboot</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -83,16 +82,32 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="IMAP.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="avboot\avproxy\auto_proxychain.hpp" />
+    <ClInclude Include="avboot\avproxy\avproxy.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\connect_condition.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\error.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_chain.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_error_mapper.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_http.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_socks5.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_ssl.hpp" />
+    <ClInclude Include="avboot\avproxy\detail\proxy_tcp.hpp" />
+    <ClInclude Include="avboot\avproxy\proxies.hpp" />
+    <ClInclude Include="avboot\avproxy\proxy_connect.hpp" />
+    <ClInclude Include="avboot\boost\avproxy.hpp" />
+    <ClInclude Include="avboot\boost\base64.hpp" />
+    <ClInclude Include="avboot\boost\timedcall.hpp" />
+    <ClInclude Include="protoc\imap.hpp" />
+    <ClInclude Include="protoc\internet_mail_format.hpp" />
+    <ClInclude Include="protoc\pop3.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="IMAP.cpp" />
-    <ClCompile Include="IMAPProtoc.cpp" />
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+    <ClCompile Include="MailProtoc.cpp" />
+    <ClCompile Include="protoc\imap.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="protoc\pop3.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
