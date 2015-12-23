@@ -58,7 +58,12 @@ inline std::string ansi_utf8( std::string const &source, const std::string &char
 	return boost::locale::conv::between( source, "UTF-8", characters ).c_str();
 }
 
-inline void mail_address_split( std::vector<std::string>	& out_mails, std::string in_mailline )
+inline std::string utf82ansi(std::string const &source, const std::string &characters = "UTF-8")
+{
+	return boost::locale::conv::between( source, "GB18030", characters ).c_str();
+}
+
+inline void mail_address_split( std::vector<std::string> &out_mails, std::string in_mailline )
 {
 	boost::split( out_mails, in_mailline, boost::is_any_of( ";," ) );
 }
@@ -66,31 +71,31 @@ inline void mail_address_split( std::vector<std::string>	& out_mails, std::strin
 inline std::string imf_base64inline_decode( std::string str )
 {
 	boost::cmatch what;
-	boost::regex ex("=\\?([^?])?\\?=");
+	boost::regex ex("(=\\?)(\\S+?)(\\?=)");
+	std::string decode_str;
 
 	while (boost::regex_search(str.c_str(), what, ex)) {
-		std::string matched_encodedstring;
-		matched_encodedstring = what[0];
-		ex.set_expression("(.*)\\?([^?])\\?(.*)");
+		const std::string matched_encodedstring = what[0];
+		boost::replace_all(str, matched_encodedstring, "");
+
+		//显示所有子串
+		boost::regex ex2("=\\?(.*)\\?([^?])\\?(.*)\\?=");
 		boost::cmatch what2;
 
-
-		if (boost::regex_search(what[1].str().c_str(), what2, ex)) {
-			std::string result, encode, charset;
+		if (boost::regex_search(matched_encodedstring.c_str(), what2, ex2))
+		{
+			std::string ctx, encode, charset;
 			charset = what2[1];	// 	gb18030
 			encode = what2[2]; //  B
-
-			if (encode == "B") {
-				result = ansi_utf8(boost::base64_decode(what2[3].str()), charset);
-				boost::replace_all(str, matched_encodedstring, result);
+			ctx = what2[3]; // ctx
+			if (encode == "B" || encode == "b")
+			{
+				decode_str.append(ansi_utf8(boost::base64_decode(ctx), charset));
 			}
-		}
-		else {
-			boost::replace_all(str, matched_encodedstring, "decodeerror");
 		}
 	}
 
-	return str;
+	return decode_str;
 }
 
 // if the about to append string will cause the line
@@ -156,7 +161,8 @@ inline std::pair<std::string, std::string> process_line( const std::string & lin
 		std::string key = what[1];
 		std::string val = what[2];
 		boost::to_lower( key );
-		return std::make_pair( key, imf_base64inline_decode( val ) );
+		const std::string base64_decode_string = imf_base64inline_decode(val);
+		return std::make_pair( key, base64_decode_string );
 	}
 
 	throw( boost::bad_expression( "not matched" ) );
