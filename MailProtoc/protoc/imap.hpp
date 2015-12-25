@@ -197,21 +197,6 @@ namespace mx
 					if (m_server_mail_count == 0)
 						continue;
 
-					// 获取当前文件夹的邮件UID
-					send_command = boost::str(m_map_command_format["FETCH-UID"] % m_server_mail_count);
-					BOOST_ASIO_CORO_YIELD 
-						m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
-					if (length != command.size())
-						return;
-
-					m_cache_stream.reset(new boost::asio::streambuf());
-					BOOST_ASIO_CORO_YIELD async_read_until(*m_mail_socket, *m_cache_stream, "a014", boost::bind(*this, _1, _2));
-					if (ec)
-						return;
-
-					std::cout << "MAIL UID： " << std::endl
-						<< cache_to_string(m_cache_stream) << std::endl << std::endl;
-
 					//// 获取所有邮件的MIME
 					for (m_current_mail_summary_index = 1; m_current_mail_summary_index <= m_server_mail_count; ++m_current_mail_summary_index)
 					{
@@ -229,13 +214,9 @@ namespace mx
 						if (ec)
 							return;
 
-						std::cout << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl;
-					}
+						m_recv_buf += cache_to_string(m_cache_stream);
 
-					// 获取当前邮件的内容
-					for (m_current_mail_summary_index = 1; m_current_mail_summary_index <= m_server_mail_count; ++m_current_mail_summary_index)
-					{
-						send_command = boost::str(m_map_command_format["FETCH-BODY"] % m_current_mail_summary_index % "BODY[TEXT]");
+						send_command = boost::str(m_map_command_format["FETCH-BODY"] % m_current_mail_summary_index);
 						BOOST_ASIO_CORO_YIELD
 							m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
 
@@ -249,7 +230,9 @@ namespace mx
 						if (ec)
 							return;
 
-						std::cout << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl;
+						m_recv_buf += cache_to_string(m_cache_stream);
+
+						m_recv_buf.clear();
 					}
 				}
 
@@ -354,7 +337,8 @@ namespace mx
 					break;
 				}
 			}
-			return boost::lexical_cast<int>(strCount);
+			int mail_count = strCount.empty() ? 0 : boost::lexical_cast<int>(strCount);
+			return mail_count;
 		}
 
 		void on_handle_send_buf(const boost::system::error_code& error, std::size_t bytes_transferred, const std::string& send_buf)
@@ -370,27 +354,6 @@ namespace mx
 			}
 		}
 
-		void on_handle_recv_command(const boost::system::error_code& error, std::size_t bytes_transferred)
-		{
-			m_recv_buf.append(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data()));
-
-			std::vector<std::string> vec_sp = split(m_recv_buf);
-			auto it_vec_sp_end = vec_sp.rbegin();
-			if (it_vec_sp_end == vec_sp.rend())
-				return;
-
-			const std::string prefix_string(it_vec_sp_end->substr(0, 4));
-			auto it_map_event_handle = m_map_handle_event.find(prefix_string);
-			if (it_map_event_handle != m_map_handle_event.end())
-			{
-				it_map_event_handle->second(m_recv_buf);
-				m_recv_buf.clear();
-			}
-			else
-			{
-				std::cout << error.message() << std::endl;
-			}
-		}
 	private:
 		// 帐号信息
 		struct imap_login_account

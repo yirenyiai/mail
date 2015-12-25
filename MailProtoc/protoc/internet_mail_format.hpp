@@ -19,13 +19,13 @@
 
 // that is for output to main.cpp
 struct mailcontent {
-	int m_id;													// imap 独占字段, 用于识别邮件进行操作
-	std::string     m_floder;
+	int m_id;													// 用于识别邮件进行操作, 用于IMAP协议
+	std::string     m_floder;									// 表示邮件所在的文件夹路径， 用于IMAP协议
 	std::string		from;
 	std::string		to;
 	std::string		subject;
-	std::string		content_type;                                 // without encoding part
-	std::string		content;                                      // already decoded to UTF-8, and the best selected content
+	std::string		content_type;                               // without encoding part
+	std::string		content;                                    // already decoded to UTF-8, and the best selected content
 
 	mailcontent()
 		: m_id(0)
@@ -53,7 +53,7 @@ struct InternetMailFormat {
 
 namespace detail {
 
-inline std::string ansi_utf8( std::string const &source, const std::string &characters = "GB18030" )
+inline std::string ansi2utf8( std::string const &source, const std::string &characters = "GB18030" )
 {
 	return boost::locale::conv::between( source, "UTF-8", characters ).c_str();
 }
@@ -90,7 +90,7 @@ inline std::string imf_base64inline_decode( std::string str )
 			ctx = what2[3]; // ctx
 			if (encode == "B" || encode == "b")
 			{
-				decode_str.append(ansi_utf8(boost::base64_decode(ctx), charset));
+				decode_str.append(ansi2utf8(boost::base64_decode(ctx), charset));
 			}
 		}
 	}
@@ -118,6 +118,7 @@ inline void checked_newline_append( std::string & to, std::string add )
 	to += add;
 }
 
+// str ：必须为 utf-8 编码
 inline std::string imf_base64inline_encode( std::string str )
 {
 	return boost::str( boost::format( "=?utf8?B?%s?=" ) % boost::base64_encode( str ) );
@@ -302,7 +303,6 @@ inline void imf_decode_multipart( InternetMailFormat &imf )
 template<class OutputStream>
 void imf_write_stream( InternetMailFormat imf, OutputStream &out )
 {
-
 	// 暂时不支持 MIME 格式.
 	BOOST_ASSERT( imf.have_multipart == false );
 

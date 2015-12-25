@@ -31,7 +31,7 @@ static std::string decode_content_charset( std::string body, std::string content
 	if( boost::regex_search( content_type.c_str(), what,  ex ) ) {
 		// text/plain; charset="gb18030" 这种，然后解码成 UTF-8
 		std::string charset = what[2];
-		return detail::ansi_utf8( body, charset );
+		return detail::ansi2utf8( body, charset );
 	}
 
 	return body;

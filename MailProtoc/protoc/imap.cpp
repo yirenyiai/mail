@@ -77,12 +77,7 @@ namespace mx
 
 		// 获取邮件内容
 		m_map_command_format.insert(
-			std::pair<std::string, boost::format>("FETCH-BODY", boost::format("a013  FETCH %1% %2%\r\n"))
-			);
-
-		// 获取邮件UID
-		m_map_command_format.insert(
-			std::pair<std::string, boost::format>("FETCH-UID", boost::format("a014  FETCH 1:%1% UID\r\n"))
+			std::pair<std::string, boost::format>("FETCH-BODY", boost::format("a013 FETCH %1% BODY[TEXT]\r\n"))
 			);
 	}
 
