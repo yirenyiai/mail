@@ -107,10 +107,11 @@ namespace mx
 		void operator()(const boost::system::error_code & ec, std::size_t length = 0, const std::string& command = "")
 		{
 			std::string send_command;
+			InternetMailFormat Imf;
 
-			auto cache_to_string= [this](boost::shared_ptr<boost::asio::streambuf> cache)->std::string{
+			auto cache_to_string = [this](boost::shared_ptr<boost::asio::streambuf> cache)->std::string{
 				std::string recv;
-				recv.append(boost::asio::buffers_begin(cache->data()), boost::asio::buffers_end(cache->data()));
+				recv.assign(boost::asio::buffers_begin(cache->data()), boost::asio::buffers_end(cache->data()));
 				return recv;
 			};
 
@@ -214,8 +215,6 @@ namespace mx
 						if (ec)
 							return;
 
-						m_recv_buf += cache_to_string(m_cache_stream);
-
 						send_command = boost::str(m_map_command_format["FETCH-BODY"] % m_current_mail_summary_index);
 						BOOST_ASIO_CORO_YIELD
 							m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
@@ -223,16 +222,13 @@ namespace mx
 						if (length != command.size())
 							return;
 
-						m_cache_stream.reset(new boost::asio::streambuf());
 						BOOST_ASIO_CORO_YIELD
 							async_read_until(*m_mail_socket, *m_cache_stream, "a013", boost::bind(*this, _1, _2));
 
 						if (ec)
 							return;
 
-						m_recv_buf += cache_to_string(m_cache_stream);
-
-						m_recv_buf.clear();
+						imf_read_stream(Imf, std::stringstream(cache_to_string(m_cache_stream)));
 					}
 				}
 
@@ -340,7 +336,6 @@ namespace mx
 			int mail_count = strCount.empty() ? 0 : boost::lexical_cast<int>(strCount);
 			return mail_count;
 		}
-
 		void on_handle_send_buf(const boost::system::error_code& error, std::size_t bytes_transferred, const std::string& send_buf)
 		{
 			if (error != 0)
@@ -353,7 +348,6 @@ namespace mx
 				m_mail_socket->async_send(boost::asio::buffer(send_buf.c_str() + bytes_transferred, less), boost::bind(&imap::on_handle_send_buf, this, _1, _2, send_buf));
 			}
 		}
-
 	private:
 		// 帐号信息
 		struct imap_login_account
@@ -391,11 +385,6 @@ namespace mx
 
 		// 
 		boost::shared_ptr<imap_main_loop> m_main_loop;
-
-
-		// 一个完整的数据包
-		std::string m_recv_buf;
-		std::vector<std::string>::iterator m_it_vec_floder;
 
 		// 命令格式
 		boost::unordered::unordered_map<std::string, boost::format> m_map_command_format;
