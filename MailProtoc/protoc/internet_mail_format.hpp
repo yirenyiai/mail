@@ -72,11 +72,10 @@ inline std::string imf_base64inline_decode( std::string str )
 {
 	boost::cmatch what;
 	boost::regex ex("(=\\?)(\\S+?)(\\?=)");
-	std::string decode_str;
+	bool match(false);
 
 	while (boost::regex_search(str.c_str(), what, ex)) {
 		const std::string matched_encodedstring = what[0];
-		boost::replace_all(str, matched_encodedstring, "");
 
 		//显示所有子串
 		boost::regex ex2("=\\?(.*)\\?([^?])\\?(.*)\\?=");
@@ -90,12 +89,18 @@ inline std::string imf_base64inline_decode( std::string str )
 			ctx = what2[3]; // ctx
 			if (encode == "B" || encode == "b")
 			{
-				decode_str.append(ansi2utf8(boost::base64_decode(ctx), charset));
+				ctx = ansi2utf8(boost::base64_decode(ctx), charset);
+				boost::replace_all(str, matched_encodedstring, ctx);
+				match = true;
 			}
+		}
+		else
+		{
+			boost::replace_all(str, matched_encodedstring, "#error#");
 		}
 	}
 
-	return decode_str;
+	return str;
 }
 
 // if the about to append string will cause the line
@@ -278,6 +283,7 @@ void mime_read_stream( MIMEcontent& mimecontent, InputStream &in, const std::str
 		}
 	}
 }
+
 
 inline void imf_decode_multipart( InternetMailFormat &imf )
 {

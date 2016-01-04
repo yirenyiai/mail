@@ -115,6 +115,32 @@ namespace mx
 				return recv;
 			};
 
+			auto filter_mime_result = [this](std::string& str)->std::string{
+				// 过滤IMAP返回的标志信息， 以获取标准的mime
+				std::vector<std::string> vec_str = split(std::move(str));
+
+				for (auto it(vec_str.begin()); it != vec_str.end(); )
+				{
+					if (it->empty())
+						continue;
+
+					const char C = *(it->begin());
+					if (C == '*' || C == ')' || it->find("a009") != std::string::npos || it->find("a013") != std::string::npos)
+					{
+						it = vec_str.erase(it);
+					}
+					else
+						++it;
+				}
+
+				str.clear();
+				std::for_each(vec_str.begin(), vec_str.end(), [&str](const std::string& line_str){
+					str += line_str;
+				});
+
+				return str;
+			};
+
 			BOOST_ASIO_CORO_REENTER(this) 
 			{
 				// 登录到服务器
@@ -198,7 +224,6 @@ namespace mx
 					if (m_server_mail_count == 0)
 						continue;
 
-					//// 获取所有邮件的MIME
 					for (m_current_mail_summary_index = 1; m_current_mail_summary_index <= m_server_mail_count; ++m_current_mail_summary_index)
 					{
 						send_command = boost::str(m_map_command_format["FETCH-SUMMARY"] % m_current_mail_summary_index);
@@ -228,7 +253,15 @@ namespace mx
 						if (ec)
 							return;
 
-						imf_read_stream(Imf, std::stringstream(cache_to_string(m_cache_stream)));
+						imf_read_stream(Imf, std::stringstream(filter_mime_result(cache_to_string(m_cache_stream))));
+						m_thismail.from = Imf.header["from"];
+						m_thismail.to = Imf.header["to"];
+						m_thismail.subject = Imf.header["subject"];
+
+						BOOST_ASIO_CORO_YIELD
+							m_io.post(boost::bind(imap::broadcast_signal, m_sig_gotmail, m_thismail, call_to_continue_function(boost::bind(*this, ec, _1))));
+						if (ec != 0)
+							return;
 					}
 				}
 
@@ -348,6 +381,16 @@ namespace mx
 				m_mail_socket->async_send(boost::asio::buffer(send_buf.c_str() + bytes_transferred, less), boost::bind(&imap::on_handle_send_buf, this, _1, _2, send_buf));
 			}
 		}
+
+		static void broadcast_signal(std::shared_ptr<imap::on_mail_function> sig_gotmail, mailcontent thismail, imap::call_to_continue_function handler)
+		{
+			if (sig_gotmail) {
+				(*sig_gotmail)(thismail, handler);
+			}
+			else {
+				handler(0);
+			}
+		}
 	private:
 		// 帐号信息
 		struct imap_login_account
@@ -375,6 +418,7 @@ namespace mx
 		int m_current_mail_summary_index;		// 辅助变量，用于轮训服务器邮件
 
 		boost::unordered::unordered_map<int, InternetMailFormat> m_mail_ctx;
+		mailcontent m_thismail;
 		std::shared_ptr<on_mail_function>	m_sig_gotmail;
 
 		// 缓冲
