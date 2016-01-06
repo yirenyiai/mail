@@ -16,10 +16,9 @@
 #include <boost/archive/iterators/ostream_iterator.hpp>
 
 #include "boost/base64.hpp"
-
+#include "boost/qp.hpp"
 // that is for output to main.cpp
 struct mailcontent {
-	int m_id;													// 用于识别邮件进行操作, 用于IMAP协议
 	std::string     m_floder;									// 表示邮件所在的文件夹路径， 用于IMAP协议
 	std::string		from;
 	std::string		to;
@@ -28,7 +27,6 @@ struct mailcontent {
 	std::string		content;                                    // already decoded to UTF-8, and the best selected content
 
 	mailcontent()
-		: m_id(0)
 	{}
 };
 
@@ -55,7 +53,16 @@ namespace detail {
 
 inline std::string ansi2utf8( std::string const &source, const std::string &characters = "GB18030" )
 {
-	return boost::locale::conv::between( source, "UTF-8", characters ).c_str();
+	std::string str;
+	try
+	{
+		str = boost::locale::conv::between(source, "UTF-8", characters).c_str();
+	}
+	catch (...)
+	{
+		str = source;
+	}
+	return str;
 }
 
 inline std::string utf82ansi(std::string const &source, const std::string &characters = "UTF-8")
@@ -90,6 +97,12 @@ inline std::string imf_base64inline_decode( std::string str )
 			if (encode == "B" || encode == "b")
 			{
 				ctx = ansi2utf8(boost::base64_decode(ctx), charset);
+				boost::replace_all(str, matched_encodedstring, ctx);
+				match = true;
+			}
+			else if (encode == "Q" || encode == "q")
+			{
+				ctx = ansi2utf8(boost::qp::qp_decode(ctx), charset);
 				boost::replace_all(str, matched_encodedstring, ctx);
 				match = true;
 			}
@@ -218,7 +231,7 @@ void imf_read_stream( InternetMailFormat& imf, InputStream &in )
 				} 
 				catch( const boost::bad_expression & e )
 				{
-					 std::cout << e.what() << std::endl;
+					  std::cout << e.what() << std::endl;
 				}
 			} else if( pre_line.empty() && !line.empty() ) {
 				// 应该是 body 模式了.

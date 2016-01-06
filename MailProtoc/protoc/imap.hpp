@@ -17,6 +17,7 @@
 #include <string>
 #include <map>
 #include "internet_mail_format.hpp"
+#include "ctx_type_select.hpp"
 
 namespace mx
 {
@@ -29,43 +30,6 @@ namespace mx
 	};
 
 	class imap;
-
-	class imap_main_loop
-		: public boost::asio::coroutine
-	{
-	public:
-		typedef void result_type;
-	public:
-		imap_main_loop(boost::shared_ptr<boost::asio::ip::tcp::socket> s)
-			: m_socket(s)
-		{
-			s->get_io_service().post(boost::bind(*this, boost::system::error_code(), 0));
-		}
-		~imap_main_loop()
-		{}
-
-		void operator()(const boost::system::error_code & ec, std::size_t length)
-		{
-			BOOST_ASIO_CORO_REENTER(this)
-			{
-				while (true)
-				{
-					m_cache_stream.reset(new boost::asio::streambuf());
-					BOOST_ASIO_CORO_YIELD
-						async_read_until(*(m_socket), *(m_cache_stream), "\r\n", boost::bind(*this, _1, _2));
-
-					if (!ec)
-					{
-						std::cout << std::string(boost::asio::buffers_begin(m_cache_stream->data()), boost::asio::buffers_end(m_cache_stream->data())) << std::endl;
-					}
-				}
-			}
-		}
-
-	public:
-		boost::shared_ptr<boost::asio::ip::tcp::socket> m_socket;
-		boost::shared_ptr<boost::asio::streambuf> m_cache_stream;
-	};
 
 	class imap
 		: public boost::asio::coroutine
@@ -85,24 +49,6 @@ namespace mx
 			m_sig_gotmail.reset(new on_mail_function(handler));
 			m_io.post(boost::bind(*this, boost::system::error_code(), 0));
 		}
-
-		// 创建目录
-		void create_dir(const std::string& floder_name);
-
-		// 删除某个目录(QQ邮箱不支持该指令)
-		void delete_dir(const std::string& floder_name);
-
-		// 修改文件夹名字(QQ邮箱不支持该指令)
-		void rename_dir(const std::string& old_floder_name, const std::string& new_floder_name);
-
-		// 获取某个邮件的详细内容
-		void get_mail_ctx(const std::string& mail_id);
-
-		// 调整当前邮件属性
-		void set_mail_attribute(const std::string& mail_id, const mail_attribute&);
-
-		// 退出当前邮箱
-		void exit_mail();
 
 		void operator()(const boost::system::error_code & ec, std::size_t length = 0, const std::string& command = "")
 		{
@@ -139,6 +85,7 @@ namespace mx
 				});
 
 				return str;
+
 			};
 
 			BOOST_ASIO_CORO_REENTER(this) 
@@ -204,6 +151,8 @@ namespace mx
 				// 发送选中收件箱指令
 				for (m_select_floder_index = 0; m_select_floder_index < m_vec_floder.size(); ++m_select_floder_index)
 				{
+					m_thismail.m_floder =  m_vec_floder[m_select_floder_index];
+ 
 					send_command = boost::str(m_map_command_format["SELECT"] % m_vec_floder[m_select_floder_index]);
 					BOOST_ASIO_CORO_YIELD
 						m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
@@ -257,41 +206,53 @@ namespace mx
 						m_thismail.from = Imf.header["from"];
 						m_thismail.to = Imf.header["to"];
 						m_thismail.subject = Imf.header["subject"];
+						select_content(m_thismail.content_type, m_thismail.content, Imf);
+
+
 
 						BOOST_ASIO_CORO_YIELD
 							m_io.post(boost::bind(imap::broadcast_signal, m_sig_gotmail, m_thismail, call_to_continue_function(boost::bind(*this, ec, _1))));
-						if (ec != 0)
+
+						if (ec)
+							return;
+
+						// 把邮件设置为已读状态
+						send_command = boost::str(m_map_command_format["STORE-SEEN"] % m_current_mail_summary_index);
+						BOOST_ASIO_CORO_YIELD
+							m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
+
+						if (length != command.size())
+							return;
+
+						m_cache_stream.reset(new boost::asio::streambuf());
+						BOOST_ASIO_CORO_YIELD
+							async_read_until(*m_mail_socket, *m_cache_stream, "a012", boost::bind(*this, _1, _2));
+
+						std::cout << "Readed ： " << std::endl
+							<< cache_to_string(m_cache_stream) << std::endl;
+
+						if (ec)
 							return;
 					}
 				}
 
-				m_main_loop.reset(new imap_main_loop(m_mail_socket));
+				// 退出当前登录的邮箱
+				send_command = boost::str(m_map_command_format["LOGOUT"]);
+				BOOST_ASIO_CORO_YIELD
+					m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
 
-				// 进入数据接收的死循环
-				m_send_status_timer = boost::make_shared<boost::asio::deadline_timer>(m_io, boost::posix_time::seconds(20));
-				do
-				{
-					// 进入一个定时循环
-					BOOST_ASIO_CORO_YIELD[this, &ec](){
-						m_send_status_timer->expires_at(m_send_status_timer->expires_at() + boost::posix_time::seconds(20));
-						m_send_status_timer->async_wait(boost::bind(*this, ec, 0));
-					}();
+				if (length != command.size())
+					return;
 
-					// 发送NOOP指令
-					BOOST_ASIO_CORO_YIELD[this](){
-						const std::string send_command = boost::str(m_map_command_format["NOOP"]);
-						m_mail_socket->async_send(boost::asio::buffer(send_command.c_str(), send_command.size()), boost::bind(*this, _1, _2, send_command));
-					}();
+				m_cache_stream.reset(new boost::asio::streambuf());
+				BOOST_ASIO_CORO_YIELD
+					async_read_until(*m_mail_socket, *m_cache_stream, "a003", boost::bind(*this, _1, _2));
 
+				if (ec)
+					return;
 
-					if (length != command.size())
-						return;
-					else
-					{
-						std::cout << "NOOP SUCCESS" << std::endl;
-					}
-
-				} while (true);
+				std::cout << "logout ： " << std::endl
+					<< cache_to_string(m_cache_stream) << std::endl;
 			}
 		}
 
@@ -424,11 +385,8 @@ namespace mx
 		// 缓冲
 		boost::shared_ptr<boost::asio::streambuf> m_cache_stream;
 
-		// 保持链接的定时器
+		// 轮训服务器定时器
 		boost::shared_ptr<boost::asio::deadline_timer> m_send_status_timer;
-
-		// 
-		boost::shared_ptr<imap_main_loop> m_main_loop;
 
 		// 命令格式
 		boost::unordered::unordered_map<std::string, boost::format> m_map_command_format;

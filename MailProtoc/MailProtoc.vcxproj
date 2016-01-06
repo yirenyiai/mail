@@ -96,7 +96,9 @@
     <ClInclude Include="avboot\avproxy\proxy_connect.hpp" />
     <ClInclude Include="avboot\boost\avproxy.hpp" />
     <ClInclude Include="avboot\boost\base64.hpp" />
+    <ClInclude Include="avboot\boost\qp.hpp" />
     <ClInclude Include="avboot\boost\timedcall.hpp" />
+    <ClInclude Include="protoc\ctx_type_select.hpp" />
     <ClInclude Include="protoc\imap.hpp" />
     <ClInclude Include="protoc\internet_mail_format.hpp" />
     <ClInclude Include="protoc\pop3.hpp" />

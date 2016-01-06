@@ -85,60 +85,6 @@ namespace mx
 	{
 	}
 
-	void imap::create_dir(const std::string& floder_name)
-	{
-		std::string command = boost::str(m_map_command_format["CREATE"] % floder_name);
-	}
-
-	void imap::delete_dir(const std::string& floder_name)
-	{
-		std::string command = boost::str(m_map_command_format["DELETE"] % floder_name);
-	}
-
-	void imap::rename_dir(const std::string& old_floder_name, const std::string& new_floder_name)
-	{
-		std::string command = boost::str(m_map_command_format["RENAME"] % old_floder_name % new_floder_name);
-	}
-
-	void imap::get_mail_ctx(const std::string& mail_id)
-	{
-		const std::string command = boost::str(m_map_command_format["FETCH-BODY"] % mail_id % "BODY[TEXT]");
-	}
-
-	// 调整当前邮件属性
-	void imap::set_mail_attribute(const std::string& mail_id, const mail_attribute& attr)
-	{
-		switch (attr)
-		{
-		case mail_attribute::mail_attribute_readed:
-		{
-			std::string command = boost::str(m_map_command_format["STORE-SEEN"] % mail_id);
-			send_command(command);
-		}
-			break;
-		case mail_attribute::mail_attribute_delete:
-		{
-			std::string command = boost::str(m_map_command_format["STORE-DELETE"] % mail_id);
-			send_command(command);
-		}
-			break;
-		default:
-			break;
-		}
-	}
-
-	void imap::exit_mail()
-	{
-		std::string command = boost::str(m_map_command_format["LOGOUT"]);
-		send_command(command);
-	}
-
-	void imap::send_command(const std::string& command)
-	{
-		if (m_mail_socket && m_mail_socket->is_open())
-			m_mail_socket->async_send(boost::asio::buffer(command.c_str(), command.size()), boost::bind(&imap::on_handle_send_buf, this, _1, _2, command));
-	}
-
 	std::vector<std::string> imap::split(const std::string& src)
 	{
 		std::vector<std::string> vec_sp;

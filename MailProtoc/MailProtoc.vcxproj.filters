@@ -72,6 +72,12 @@
     <ClInclude Include="protoc\pop3.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="avboot\boost\qp.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="protoc\ctx_type_select.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MailProtoc.cpp">
