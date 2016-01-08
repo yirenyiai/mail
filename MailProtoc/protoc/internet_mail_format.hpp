@@ -246,11 +246,10 @@ void imf_read_stream( InternetMailFormat& imf, InputStream &in )
 				// 依据 content-franster-encoding 解码 body
 				std::string content_transfer_encoding = imf.header["content-transfer-encoding"];
 
-				if( boost::to_lower_copy( content_transfer_encoding ) == "base64" ) {
+				if( boost::to_lower_copy( content_transfer_encoding ) == "base64" ) 
 					imf.body = boost::base64_decode( body );
-				} else {
+				else 
 					imf.body = body;
-				}
 
 				imf_decode_multipart( imf );
 				return;
