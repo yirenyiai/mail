@@ -14,15 +14,18 @@ void fetch_mail(const mailcontent& mail_ctx, mx::imap::call_to_continue_function
 }
 
 
-int main()
+int main(int argc, char* argv[])
 {
-	boost::asio::io_service io;
+	if (argc == 4)
+	{
+		boost::asio::io_service io;
 
-	mx::imap imap(io, "", "", "imap.qq.com");
+		mx::imap imap(io, argv[1], argv[2], argv[3]);
 
-	imap.async_fetch_mail(fetch_mail);
+		imap.async_fetch_mail(fetch_mail);
 
 
-	io.run();
+		io.run();
+	}
 	return 0;
 }
