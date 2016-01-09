@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
 	{
 		boost::asio::io_service io;
 
-		mx::imap imap(io, argv[1], argv[2], argv[3]);
+		mx::imap imap(io, argv[1], argv[2], argv[3], true);
 
 		imap.async_fetch_mail(fetch_mail);
 

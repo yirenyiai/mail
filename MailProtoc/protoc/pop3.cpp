@@ -39,10 +39,11 @@ void pop3::process_mail( std::istream &mail, Handler handler )
 	io_service.post( boost::bind( broadcast_signal, m_sig_gotmail, thismail, call_to_continue_function( handler ) ) );
 }
 
-pop3::pop3( boost::asio::io_service& _io_service, std::string user, std::string passwd, std::string _mailserver )
+pop3::pop3( boost::asio::io_service& _io_service, std::string user, std::string passwd, std::string _mailserver, bool use_ssl )
 	: io_service( _io_service ),
 	  m_mailaddr( user ), m_passwd( passwd ),
 	  m_mailserver( _mailserver ),
+	  m_port( use_ssl ? "993" : "110" ),
 	  m_writebuf( new boost::asio::streambuf )
 {
 	if( m_mailserver.empty() ) { // 自动从　mailaddress 获得.

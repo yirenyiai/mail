@@ -23,7 +23,7 @@ public:
 	typedef std::function< void ( int ) >  call_to_continue_function;
 	typedef std::function< void ( mailcontent, call_to_continue_function )>  on_mail_function;
 public:
-	pop3( ::boost::asio::io_service & _io_service, std::string user, std::string passwd, std::string _mailserver = "" );
+	pop3( ::boost::asio::io_service & _io_service, std::string user, std::string passwd, std::string _mailserver = "", bool use_ssl = false );
 
 	void operator()( const boost::system::error_code & ec, std::size_t length = 0 ) {
 		using namespace boost::asio;
@@ -35,7 +35,6 @@ public:
 		std::string		msg;
 
 		BOOST_ASIO_CORO_REENTER( this ) {
-		restart:
 			m_socket.reset( new ip::tcp::socket( io_service ) );
 
 			do {
@@ -46,7 +45,7 @@ public:
 
 				// dns 解析并连接.
 				BOOST_ASIO_CORO_YIELD avproxy::async_proxy_connect(
-					avproxy::autoproxychain( *m_socket, ip::tcp::resolver::query( m_mailserver, "110" ) ),
+					avproxy::autoproxychain(*m_socket, ip::tcp::resolver::query(m_mailserver, m_port)),
 					*this );
 
 				// 失败了延时 10s
@@ -62,7 +61,7 @@ public:
 
 			if( status != "+OK" ) {
 				// 失败，重试.
-				goto restart;
+				return;
 			}
 
 			// 发送用户名.
@@ -71,7 +70,7 @@ public:
 			if ( ec ) 
 			{ 
 				std::cout << ec.message() << std::endl;
-				goto restart;
+				return;
 			}
 
 			// 接受返回状态.
@@ -82,7 +81,7 @@ public:
 			// 解析是不是　OK.
 			if( status != "+OK" ) {
 				// 失败，重试.
-				goto restart;
+				return;
 			}
 
 			// 发送密码.
@@ -96,7 +95,7 @@ public:
 			// 解析是不是　OK.
 			if( status != "+OK" ) {
 				// 失败，重试.
-				goto restart;
+				return;
 			}
 
 			// 完成登录. 开始接收邮件.
@@ -111,7 +110,7 @@ public:
 			// 解析是不是　OK.
 			if( status != "+OK" ) {
 				// 失败，重试.
-				goto restart;
+				return;
 			}
 
 			// 开始进入循环处理邮件.
@@ -146,7 +145,7 @@ public:
 				// 解析是不是　OK.
 				if( status != "+OK" ) {
 					// 失败，重试.
-					goto restart;
+					return;
 				}
 
 				// 获取邮件内容，邮件一单行的 . 结束.
@@ -170,7 +169,8 @@ public:
 					if( status != "+OK" ) {
 						// 失败，但是并不是啥大问题.
 						// but 如果是连接出问题那还是要重启的.
-						if( ec ) goto restart;
+						if( ec ) 
+							return;
 					}
 
 #	 endif
@@ -195,7 +195,6 @@ public:
 			}
 
 			BOOST_ASIO_CORO_YIELD ::boost::delayedcallsec( io_service, 10, boost::bind( *this, ec, 0 ) );
-			goto restart;
 		}
 	}
 
@@ -221,7 +220,7 @@ private:
 private:
 	::boost::asio::io_service & io_service;
 
-	std::string m_mailaddr, m_passwd, m_mailserver;
+	std::string m_mailaddr, m_passwd, m_mailserver, m_port;
 	// 必须是可拷贝的，所以只能用共享指针.
 	std::shared_ptr<boost::asio::ip::tcp::socket>	m_socket;
 	std::shared_ptr<boost::asio::streambuf>	m_readbuf;
