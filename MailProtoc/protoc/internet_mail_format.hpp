@@ -248,6 +248,10 @@ void imf_read_stream( InternetMailFormat& imf, InputStream &in )
 
 				if( boost::to_lower_copy( content_transfer_encoding ) == "base64" ) 
 					imf.body = boost::base64_decode( body );
+				else if ( boost::to_lower_copy(content_transfer_encoding) == "quoted-printable" )
+				{
+					imf.body = boost::qp::qp_decode( body );
+				}
 				else 
 					imf.body = body;
 

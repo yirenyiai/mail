@@ -43,7 +43,7 @@ pop3::pop3( boost::asio::io_service& _io_service, std::string user, std::string 
 	: io_service( _io_service ),
 	  m_mailaddr( user ), m_passwd( passwd ),
 	  m_mailserver( _mailserver ),
-	  m_port( use_ssl ? "993" : "110" ),
+	  m_port( use_ssl ? "995" : "110" ),
 	  m_writebuf( new boost::asio::streambuf )
 {
 	if( m_mailserver.empty() ) { // 自动从　mailaddress 获得.
