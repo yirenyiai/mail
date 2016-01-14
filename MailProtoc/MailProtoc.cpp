@@ -3,7 +3,7 @@
 
 #include "protoc\pop3.hpp"
 #include "protoc\imap.hpp"
-
+#include "protoc\smtp.hpp"
 
 void imap_fetch_mail(const mailcontent& mail_ctx, mx::imap::call_to_continue_function handler)
 {

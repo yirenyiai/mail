@@ -208,8 +208,6 @@ namespace mx
 						m_thismail.subject = Imf.header["subject"];
 						select_content(m_thismail.content_type, m_thismail.content, Imf);
 
-
-
 						BOOST_ASIO_CORO_YIELD
 							m_io.post(boost::bind(imap::broadcast_signal, m_sig_gotmail, m_thismail, call_to_continue_function(boost::bind(*this, ec, _1))));
 

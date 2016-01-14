@@ -117,7 +117,7 @@ void base64_encode(std::string src, OStreamIterator ostream_iterator)
 		tailbase.resize(5);
 
 		std::copy(base64encode_linebreaks_Iterator(tail.begin()), base64encode_linebreaks_Iterator(tail.begin() + 3), tailbase.begin());
-		for (int k=0;k<(3-i);k++){
+		for (unsigned k=0;k<(3-i);k++){
 			tailbase[3-k] = '=';
 		}
 		

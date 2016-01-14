@@ -98,6 +98,7 @@
     <ClInclude Include="avboot\avproxy\detail\proxy_tcp.hpp" />
     <ClInclude Include="avboot\avproxy\proxies.hpp" />
     <ClInclude Include="avboot\avproxy\proxy_connect.hpp" />
+    <ClInclude Include="avboot\boost\avloop.hpp" />
     <ClInclude Include="avboot\boost\avproxy.hpp" />
     <ClInclude Include="avboot\boost\base64.hpp" />
     <ClInclude Include="avboot\boost\qp.hpp" />
@@ -106,6 +107,7 @@
     <ClInclude Include="protoc\imap.hpp" />
     <ClInclude Include="protoc\internet_mail_format.hpp" />
     <ClInclude Include="protoc\pop3.hpp" />
+    <ClInclude Include="protoc\smtp.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MailProtoc.cpp" />
@@ -115,6 +117,7 @@
     <ClCompile Include="protoc\pop3.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="protoc\smtp.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
